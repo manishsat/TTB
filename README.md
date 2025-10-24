@@ -2,6 +2,8 @@
 
 AI-powered web application that simulates the Alcohol and Tobacco Tax and Trade Bureau (TTB) label approval process. The application verifies alcohol beverage labels against submitted form data using OCR (Optical Character Recognition) technology.
 
+Personal project exploring AI/OCR integration in regulatory compliance workflows.
+
 ## 🎯 Project Overview
 
 This full-stack application allows users to:
@@ -327,7 +329,7 @@ Health check endpoint.
 
 ## 🤝 Contributing
 
-This is a take-home project for educational purposes. Feel free to fork and enhance!
+This is an open-source project for learning and experimentation. Contributions, issues, and feature requests are welcome!
 
 ## 📄 License
 
@@ -335,7 +337,7 @@ MIT License - feel free to use this project for learning and development.
 
 ## 👨‍💻 Author
 
-Developed as part of a technical assessment demonstrating full-stack development skills with AI/OCR integration.
+Personal project showcasing full-stack development with AI/OCR integration and modern web technologies.
 
 ---
 
