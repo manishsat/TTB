@@ -8,12 +8,14 @@ export const verifyLabel = async (
   productClass: string,
   alcoholContent: number,
   netContents: string,
-  labelImage: File
+  labelImage: File,
+  beverageType: string = 'spirits'
 ): Promise<VerificationResponse> => {
   const formData = new FormData();
   formData.append('brand_name', brandName);
   formData.append('product_class', productClass);
   formData.append('alcohol_content', alcoholContent.toString());
+  formData.append('beverage_type', beverageType);
   
   if (netContents) {
     formData.append('net_contents', netContents);

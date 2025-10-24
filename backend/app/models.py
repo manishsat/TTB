@@ -3,6 +3,14 @@ Pydantic models for request/response validation
 """
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
+from enum import Enum
+
+
+class BeverageType(str, Enum):
+    """Supported beverage types with different validation rules"""
+    SPIRITS = "spirits"
+    WINE = "wine"
+    BEER = "beer"
 
 
 class BoundingBox(BaseModel):
