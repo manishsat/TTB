@@ -101,7 +101,7 @@ def normalize_text(text: str) -> str:
     return re.sub(r'\s+', ' ', text.lower().strip())
 
 
-def fuzzy_match(text: str, pattern: str, threshold: float = 0.8) -> bool:
+def fuzzy_match(text: str, pattern: str, threshold: float = 0.8) -> tuple[bool, Optional[str]]:
     """
     Check if pattern exists in text using fuzzy matching
     
@@ -111,14 +111,18 @@ def fuzzy_match(text: str, pattern: str, threshold: float = 0.8) -> bool:
         threshold: Similarity threshold (0.0 to 1.0)
         
     Returns:
-        True if pattern found with similarity >= threshold
+        Tuple of (matched: bool, found_text: Optional[str])
+        If matched, found_text contains the actual text that matched
     """
     text_norm = normalize_text(text)
     pattern_norm = normalize_text(pattern)
     
     # Exact substring match
     if pattern_norm in text_norm:
-        return True
+        # Find the actual text that matched
+        idx = text_norm.index(pattern_norm)
+        # Return the original case version
+        return True, text[idx:idx + len(pattern)]
     
     # Fuzzy match using Levenshtein distance
     # Check if pattern appears as a substring with fuzzy matching
@@ -126,13 +130,75 @@ def fuzzy_match(text: str, pattern: str, threshold: float = 0.8) -> bool:
     pattern_words = pattern_norm.split()
     
     # Try to find consecutive words that match the pattern
+    best_match = None
+    best_similarity = 0.0
+    
     for i in range(len(words) - len(pattern_words) + 1):
         window = ' '.join(words[i:i + len(pattern_words)])
         similarity = ratio(window, pattern_norm)
-        if similarity >= threshold:
-            return True
+        if similarity >= threshold and similarity > best_similarity:
+            best_similarity = similarity
+            # Find the original text for this window
+            original_words = text.split()
+            best_match = ' '.join(original_words[i:i + len(pattern_words)])
     
-    return False
+    if best_match:
+        return True, best_match
+    
+    return False, None
+
+
+def extract_brand_name(text: str) -> Optional[str]:
+    """
+    Extract the brand name from label text (typically first line or large text)
+    
+    Args:
+        text: OCR extracted text
+        
+    Returns:
+        Likely brand name or None
+    """
+    lines = text.strip().split('\n')
+    if lines:
+        # First non-empty line is usually the brand
+        for line in lines:
+            line = line.strip()
+            if line and len(line) > 1:  # Skip single characters
+                return line
+    return None
+
+
+def extract_product_type(text: str) -> Optional[str]:
+    """
+    Extract product type from label text
+    
+    Args:
+        text: OCR extracted text
+        
+    Returns:
+        Likely product type or None
+    """
+    # Common alcohol product types
+    product_types = [
+        'bourbon whiskey', 'bourbon', 'whiskey', 'whisky',
+        'vodka', 'rum', 'gin', 'tequila', 'brandy',
+        'scotch', 'rye', 'cognac', 'beer', 'wine',
+        'kentucky straight bourbon whiskey'
+    ]
+    
+    text_lower = text.lower()
+    
+    # Find the longest matching product type
+    found_types = []
+    for ptype in product_types:
+        if ptype in text_lower:
+            found_types.append(ptype)
+    
+    if found_types:
+        # Return longest match (more specific)
+        return max(found_types, key=len).title()
+    
+    return None
 
 
 def extract_percentage(text: str) -> Optional[float]:
@@ -188,11 +254,16 @@ def verify_label_data(
     all_matched = True
     
     # Check 1: Brand Name
-    brand_matched = fuzzy_match(extracted_text, brand_name, threshold=0.75)
+    brand_matched, found_brand = fuzzy_match(extracted_text, brand_name, threshold=0.75)
+    
+    # If no match found, try to extract what brand IS on the label
+    if not found_brand:
+        found_brand = extract_brand_name(extracted_text)
+    
     checks.append(FieldCheck(
         field_name="Brand Name",
         expected_value=brand_name,
-        found_value=brand_name if brand_matched else "Not found or mismatch",
+        found_value=found_brand if found_brand else "Not found",
         matched=brand_matched,
         message=f"✓ Brand name '{brand_name}' found on label" if brand_matched 
                 else f"✗ Brand name '{brand_name}' not found on label"
@@ -200,11 +271,16 @@ def verify_label_data(
     all_matched = all_matched and brand_matched
     
     # Check 2: Product Class/Type
-    product_matched = fuzzy_match(extracted_text, product_class, threshold=0.75)
+    product_matched, found_product = fuzzy_match(extracted_text, product_class, threshold=0.75)
+    
+    # If no match found, try to extract what product type IS on the label
+    if not found_product:
+        found_product = extract_product_type(extracted_text)
+    
     checks.append(FieldCheck(
         field_name="Product Class/Type",
         expected_value=product_class,
-        found_value=product_class if product_matched else "Not found or mismatch",
+        found_value=found_product if found_product else "Not found",
         matched=product_matched,
         message=f"✓ Product class '{product_class}' found on label" if product_matched
                 else f"✗ Product class '{product_class}' not found on label"
@@ -268,15 +344,25 @@ def verify_label_data(
             all_matched = all_matched and net_matched
     
     # Check 5: Government Warning (bonus check)
-    warning_found = any(fuzzy_match(extracted_text, keyword, threshold=0.85) 
-                       for keyword in GOVT_WARNING_KEYWORDS)
+    warning_found, found_warning = any(
+        (match := fuzzy_match(extracted_text, keyword, threshold=0.85))[0]
+        for keyword in GOVT_WARNING_KEYWORDS
+    ) or (False, None), None
+    
+    # Simpler approach - just check if any keyword matches
+    warning_matched = False
+    for keyword in GOVT_WARNING_KEYWORDS:
+        matched, _ = fuzzy_match(extracted_text, keyword, threshold=0.85)
+        if matched:
+            warning_matched = True
+            break
     
     checks.append(FieldCheck(
         field_name="Government Warning",
         expected_value="Required warning text",
-        found_value="Present" if warning_found else "Not found",
-        matched=warning_found,
-        message="✓ Government warning statement found on label" if warning_found
+        found_value="Present" if warning_matched else "Not found",
+        matched=warning_matched,
+        message="✓ Government warning statement found on label" if warning_matched
                 else "⚠️ Government warning statement not detected (required by law)"
     ))
     # Warning is important but won't fail the overall match for now
