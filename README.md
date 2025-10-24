@@ -55,7 +55,7 @@ Download and install from: https://github.com/UB-Mannheim/tesseract/wiki
 ### 1. Clone the Repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/manishsat/TTB.git
 cd TTB
 ```
 
@@ -120,6 +120,42 @@ TTB/
 ├── Requirements/                # Project requirements PDF
 └── README.md
 ```
+
+## 🧪 Test Images
+
+Comprehensive test suite organized by scenario:
+
+```
+test_labels/
+├── clear_bourbon.png              # ✅ Success: Clean spirits label
+├── compressed_ipa.jpg              # ✅ Success: Compressed image format
+├── low_contrast_vodka.png          # ⚠️  Edge case: Low contrast text
+├── slightly_blurry_beer.png        # ⚠️  Edge case: Slight blur
+├── test_ocr.png                    # ✅ General OCR test
+├── tiny_bourbon.png                # ❌ Quality: Too small (< 400x400)
+│
+├── failures/                       # ❌ Validation failure scenarios
+│   ├── missing_warning.png         # Missing government warning
+│   ├── multiple_errors.png         # Multiple field mismatches
+│   ├── wrong_alcohol_content.png   # ABV doesn't match
+│   ├── wrong_brand.png             # Brand name mismatch
+│   ├── wrong_product_type.png      # Product type mismatch
+│   └── wrong_volume.png            # Net contents mismatch
+│
+├── ocr_tolerance_tests/           # 🔄 OCR error tolerance testing
+│   └── error_tolerance_test.png    # L→I, O→0 character errors
+│
+└── product_types/                 # 🍷🍺 Multiple beverage types
+    ├── beer_label.png              # Beer with ingredients list
+    └── wine_label.png              # Wine with sulfites & vintage
+```
+
+### Test Coverage
+- ✅ **Success scenarios** - Correct labels that pass all checks
+- ❌ **Failure scenarios** - Intentional mismatches for each field
+- ⚠️ **Edge cases** - Low quality, blur, compression
+- 🔄 **OCR tolerance** - Character substitution errors (l→i, O→0)
+- 🍷🍺 **Multiple types** - Wine (sulfites, vintage) & Beer (ingredients)
 
 ## 🔧 Configuration
 

@@ -18,6 +18,7 @@ const LabelVerificationForm: React.FC<Props> = ({
   const [productClass, setProductClass] = useState('');
   const [alcoholContent, setAlcoholContent] = useState<string>('');
   const [netContents, setNetContents] = useState('');
+  const [beverageType, setBeverageType] = useState('spirits');
   const [labelImage, setLabelImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState<string>('');
@@ -86,7 +87,8 @@ const LabelVerificationForm: React.FC<Props> = ({
         productClass,
         parseFloat(alcoholContent),
         netContents,
-        labelImage
+        labelImage,
+        beverageType
       );
       onVerificationComplete(response, imagePreview!);
     } catch (err: any) {
@@ -117,6 +119,29 @@ const LabelVerificationForm: React.FC<Props> = ({
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
           disabled={isLoading}
         />
+      </div>
+
+      {/* Beverage Type */}
+      <div>
+        <label htmlFor="beverageType" className="block text-sm font-medium text-gray-700 mb-1">
+          Beverage Type <span className="text-red-500">*</span>
+        </label>
+        <select
+          id="beverageType"
+          value={beverageType}
+          onChange={(e) => setBeverageType(e.target.value)}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          disabled={isLoading}
+        >
+          <option value="spirits">Distilled Spirits (Whiskey, Vodka, Rum, etc.)</option>
+          <option value="wine">Wine</option>
+          <option value="beer">Beer</option>
+        </select>
+        <p className="text-xs text-gray-500 mt-1">
+          {beverageType === 'wine' && '(Wine labels require sulfite declaration)'}
+          {beverageType === 'beer' && '(Beer labels may include ingredients list)'}
+          {beverageType === 'spirits' && '(Standard spirit label verification)'}
+        </p>
       </div>
 
       {/* Product Class/Type */}

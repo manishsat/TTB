@@ -9,7 +9,7 @@ import logging
 
 from app.ocr import extract_text_from_image, validate_image_quality, extract_text_with_boxes
 from app.verification import verify_label_data
-from app.models import VerificationResponse
+from app.models import VerificationResponse, BeverageType
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -48,23 +48,25 @@ async def verify_label(
     product_class: str = Form(...),
     alcohol_content: float = Form(...),
     net_contents: Optional[str] = Form(None),
+    beverage_type: str = Form("spirits"),
     label_image: UploadFile = File(...)
 ):
     """
-    Verify alcohol label against form data
+    Verify alcohol label against form data with beverage-type specific rules
     
     Args:
         brand_name: Brand name from form
         product_class: Product class/type from form
         alcohol_content: Alcohol by volume (ABV) percentage
         net_contents: Net contents/volume (optional)
+        beverage_type: Type of beverage (spirits, wine, beer)
         label_image: Uploaded label image file
     
     Returns:
         VerificationResponse with match results and details
     """
     try:
-        logger.info(f"Processing verification request for brand: {brand_name}")
+        logger.info(f"Processing verification request for {beverage_type} - brand: {brand_name}")
         
         # Validate file type
         if not label_image.content_type.startswith('image/'):
@@ -108,13 +110,20 @@ async def verify_label(
         logger.info(f"Extracted text length: {len(extracted_text)} characters")
         logger.info(f"OCR EXTRACTED TEXT:\n{extracted_text}\n")
         
-        # Verify extracted data against form inputs
+        # Convert beverage_type string to enum
+        try:
+            bev_type = BeverageType(beverage_type.lower())
+        except ValueError:
+            bev_type = BeverageType.SPIRITS  # Default to spirits
+        
+        # Verify extracted data against form inputs with beverage-specific rules
         verification_result = verify_label_data(
             extracted_text=extracted_text,
             brand_name=brand_name,
             product_class=product_class,
             alcohol_content=alcohol_content,
-            net_contents=net_contents
+            net_contents=net_contents,
+            beverage_type=bev_type
         )
         
         # Add word boxes to response for frontend highlighting

@@ -56,7 +56,7 @@ import logging
 from typing import Optional
 from Levenshtein import ratio
 
-from app.models import VerificationResponse, FieldCheck
+from app.models import VerificationResponse, FieldCheck, BeverageType
 
 logger = logging.getLogger(__name__)
 
@@ -230,15 +230,84 @@ def extract_percentage(text: str) -> Optional[float]:
     return None
 
 
+def check_sulfite_declaration(text: str) -> bool:
+    """
+    Check for sulfite declaration (required for wine)
+    
+    Args:
+        text: OCR extracted text
+        
+    Returns:
+        True if sulfite declaration found
+    """
+    sulfite_patterns = [
+        "contains sulfites",
+        "contains sulphites",
+        "sulfite",
+        "sulphite"
+    ]
+    
+    text_lower = text.lower()
+    return any(pattern in text_lower for pattern in sulfite_patterns)
+
+
+def check_vintage_year(text: str) -> Optional[int]:
+    """
+    Extract vintage year from wine label
+    
+    Args:
+        text: OCR extracted text
+        
+    Returns:
+        Vintage year or None
+    """
+    # Look for 4-digit years between 1900-2099
+    pattern = r'\b(19\d{2}|20\d{2})\b'
+    matches = re.findall(pattern, text)
+    
+    if matches:
+        # Return first year found
+        return int(matches[0])
+    
+    return None
+
+
+def check_ingredients_list(text: str) -> bool:
+    """
+    Check for ingredients list (common on beer labels)
+    
+    Args:
+        text: OCR extracted text
+        
+    Returns:
+        True if ingredients list appears to be present
+    """
+    ingredient_keywords = [
+        "ingredients",
+        "contains",
+        "water",
+        "barley",
+        "hops",
+        "yeast",
+        "malt"
+    ]
+    
+    text_lower = text.lower()
+    # Consider ingredients present if we find at least 2 keywords
+    found_count = sum(1 for keyword in ingredient_keywords if keyword in text_lower)
+    return found_count >= 2
+
+
 def verify_label_data(
     extracted_text: str,
     brand_name: str,
     product_class: str,
     alcohol_content: float,
-    net_contents: Optional[str] = None
+    net_contents: Optional[str] = None,
+    beverage_type: BeverageType = BeverageType.SPIRITS
 ) -> VerificationResponse:
     """
-    Verify label data against form inputs
+    Verify label data against form inputs with beverage-type specific rules
     
     Args:
         extracted_text: OCR extracted text from label
@@ -246,6 +315,7 @@ def verify_label_data(
         product_class: Expected product class/type
         alcohol_content: Expected alcohol content (ABV %)
         net_contents: Expected net contents/volume (optional)
+        beverage_type: Type of beverage (spirits, wine, beer)
         
     Returns:
         VerificationResponse with detailed verification results
@@ -368,12 +438,51 @@ def verify_label_data(
     # Warning is important but won't fail the overall match for now
     # In production, this would be mandatory
     
+    # Beverage-type specific checks
+    if beverage_type == BeverageType.WINE:
+        # Check for sulfite declaration (required for wine)
+        sulfite_found = check_sulfite_declaration(extracted_text)
+        checks.append(FieldCheck(
+            field_name="Sulfite Declaration",
+            expected_value="Contains Sulfites",
+            found_value="Present" if sulfite_found else "Not found",
+            matched=sulfite_found,
+            message="✓ Sulfite declaration found on label" if sulfite_found
+                    else "✗ Sulfite declaration not found (required for wine)"
+        ))
+        all_matched = all_matched and sulfite_found
+        
+        # Check for vintage year (optional but common)
+        vintage_year = check_vintage_year(extracted_text)
+        checks.append(FieldCheck(
+            field_name="Vintage Year",
+            expected_value="Vintage year (if applicable)",
+            found_value=str(vintage_year) if vintage_year else "Not found",
+            matched=vintage_year is not None,
+            message=f"✓ Vintage year {vintage_year} found on label" if vintage_year
+                    else "ℹ️ No vintage year found (optional for some wines)"
+        ))
+        # Don't fail overall match if vintage year missing (optional)
+        
+    elif beverage_type == BeverageType.BEER:
+        # Check for ingredients list (often present on craft beer)
+        ingredients_found = check_ingredients_list(extracted_text)
+        checks.append(FieldCheck(
+            field_name="Ingredients",
+            expected_value="Ingredients list",
+            found_value="Present" if ingredients_found else "Not found",
+            matched=ingredients_found,
+            message="✓ Ingredients list found on label" if ingredients_found
+                    else "ℹ️ Ingredients list not detected (optional but common)"
+        ))
+        # Don't fail overall match if ingredients missing (not always required)
+    
     # Generate overall message
     if all_matched:
-        message = "✅ The label matches the form data. All required information is consistent."
+        message = f"✅ The {beverage_type.value} label matches the form data. All required information is consistent."
     else:
         failed_checks = [check.field_name for check in checks if not check.matched and check.field_name != "Government Warning"]
-        message = f"❌ The label does not match the form. Issues found in: {', '.join(failed_checks)}"
+        message = f"❌ The {beverage_type.value} label does not match the form. Issues found in: {', '.join(failed_checks)}"
     
     return VerificationResponse(
         success=True,
