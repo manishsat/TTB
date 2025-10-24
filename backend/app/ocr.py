@@ -89,3 +89,72 @@ def extract_text_from_image(image_bytes: bytes) -> str:
     except Exception as e:
         logger.error(f"Error extracting text from image: {str(e)}")
         raise Exception(f"OCR processing failed: {str(e)}")
+
+
+def extract_text_with_boxes(image_bytes: bytes) -> tuple[str, dict]:
+    """
+    Extract text from image with bounding box coordinates for highlighting
+    
+    Args:
+        image_bytes: Image file as bytes
+        
+    Returns:
+        Tuple of (extracted_text, word_boxes_dict)
+        word_boxes_dict: {word: {'left': x, 'top': y, 'width': w, 'height': h, 'conf': confidence}}
+    """
+    try:
+        # Open image from bytes
+        image = Image.open(io.BytesIO(image_bytes))
+        
+        # Convert to RGB if necessary
+        if image.mode != 'RGB':
+            image = image.convert('RGB')
+        
+        # Perform OCR with detailed data
+        custom_config = r'--oem 3 --psm 3'
+        
+        # Get text
+        text = pytesseract.image_to_string(image, config=custom_config)
+        
+        # Get detailed word-level data with bounding boxes
+        # Returns: level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text
+        data = pytesseract.image_to_data(image, config=custom_config, output_type=pytesseract.Output.DICT)
+        
+        # Build word boxes dictionary
+        word_boxes = {}
+        n_boxes = len(data['text'])
+        
+        for i in range(n_boxes):
+            word_text = data['text'][i].strip()
+            conf = int(data['conf'][i])
+            
+            # Only include words with good confidence (> 30) and non-empty text
+            if word_text and conf > 30:
+                # Store bounding box info for each word
+                # If word appears multiple times, store as list
+                box_info = {
+                    'left': data['left'][i],
+                    'top': data['top'][i],
+                    'width': data['width'][i],
+                    'height': data['height'][i],
+                    'conf': conf
+                }
+                
+                word_lower = word_text.lower()
+                if word_lower in word_boxes:
+                    # Word already exists, store multiple occurrences
+                    if isinstance(word_boxes[word_lower], list):
+                        word_boxes[word_lower].append(box_info)
+                    else:
+                        # Convert to list
+                        word_boxes[word_lower] = [word_boxes[word_lower], box_info]
+                else:
+                    word_boxes[word_lower] = box_info
+        
+        logger.info(f"OCR extracted {len(text)} characters with {len(word_boxes)} unique words")
+        
+        return text.strip(), word_boxes
+        
+    except Exception as e:
+        logger.error(f"Error extracting text with boxes: {str(e)}")
+        raise Exception(f"OCR processing failed: {str(e)}")

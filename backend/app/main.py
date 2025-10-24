@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import logging
 
-from app.ocr import extract_text_from_image, validate_image_quality
+from app.ocr import extract_text_from_image, validate_image_quality, extract_text_with_boxes
 from app.verification import verify_label_data
 from app.models import VerificationResponse
 
@@ -90,9 +90,9 @@ async def verify_label(
                 checks=[]
             )
         
-        # Extract text from image using OCR
+        # Extract text from image using OCR with bounding boxes
         logger.info("Extracting text from label image...")
-        extracted_text = extract_text_from_image(image_bytes)
+        extracted_text, word_boxes = extract_text_with_boxes(image_bytes)
         
         if not extracted_text or len(extracted_text.strip()) < 10:
             logger.warning("Could not extract sufficient text from image")
@@ -101,7 +101,8 @@ async def verify_label(
                 overall_match=False,
                 message="⚠️ Could not read text from the label image. Please try a clearer image.",
                 extracted_text=extracted_text,
-                checks=[]
+                checks=[],
+                word_boxes={}
             )
         
         logger.info(f"Extracted text length: {len(extracted_text)} characters")
@@ -115,6 +116,9 @@ async def verify_label(
             alcohol_content=alcohol_content,
             net_contents=net_contents
         )
+        
+        # Add word boxes to response for frontend highlighting
+        verification_result.word_boxes = word_boxes
         
         logger.info(f"Verification complete. Match: {verification_result.overall_match}")
         

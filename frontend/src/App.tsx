@@ -7,9 +7,11 @@ function App() {
   const [results, setResults] = useState<VerificationResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [formKey, setFormKey] = useState(0); // Key to force form reset
+  const [labelImageUrl, setLabelImageUrl] = useState<string | null>(null);
 
-  const handleVerificationComplete = (response: VerificationResponse) => {
+  const handleVerificationComplete = (response: VerificationResponse, imageUrl: string) => {
     setResults(response);
+    setLabelImageUrl(imageUrl);
     setIsLoading(false);
   };
 
@@ -20,6 +22,7 @@ function App() {
 
   const handleReset = () => {
     setResults(null);
+    setLabelImageUrl(null);
     setFormKey(prev => prev + 1); // Increment key to reset form
   };
 
@@ -62,7 +65,7 @@ function App() {
                 <p className="mt-4 text-gray-600">Processing label image...</p>
               </div>
             ) : results ? (
-              <VerificationResults results={results} onReset={handleReset} />
+              <VerificationResults results={results} onReset={handleReset} imageUrl={labelImageUrl || undefined} />
             ) : (
               <div className="flex items-center justify-center py-12 text-gray-400">
                 <p>Submit the form to see verification results</p>

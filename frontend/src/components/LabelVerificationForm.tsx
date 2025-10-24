@@ -4,7 +4,7 @@ import { verifyLabel } from '../services/api';
 import type { VerificationResponse } from '../types';
 
 interface Props {
-  onVerificationComplete: (response: VerificationResponse) => void;
+  onVerificationComplete: (response: VerificationResponse, imageUrl: string) => void;
   onVerificationStart: () => void;
   isLoading: boolean;
 }
@@ -88,7 +88,7 @@ const LabelVerificationForm: React.FC<Props> = ({
         netContents,
         labelImage
       );
-      onVerificationComplete(response);
+      onVerificationComplete(response, imagePreview!);
     } catch (err: any) {
       setError(err.response?.data?.detail || 'An error occurred during verification');
       onVerificationComplete({
@@ -97,7 +97,7 @@ const LabelVerificationForm: React.FC<Props> = ({
         message: 'Verification failed',
         extracted_text: '',
         checks: [],
-      });
+      }, imagePreview || '');
     }
   };
 

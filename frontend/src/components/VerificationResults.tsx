@@ -1,12 +1,14 @@
 import React from 'react';
 import type { VerificationResponse } from '../types';
+import ImageWithHighlights from './ImageWithHighlights';
 
 interface Props {
   results: VerificationResponse;
   onReset: () => void;
+  imageUrl?: string;
 }
 
-const VerificationResults: React.FC<Props> = ({ results, onReset }) => {
+const VerificationResults: React.FC<Props> = ({ results, onReset, imageUrl }) => {
   return (
     <div className="space-y-4">
       {/* Overall Result */}
@@ -136,6 +138,16 @@ const VerificationResults: React.FC<Props> = ({ results, onReset }) => {
           </pre>
         </div>
       </details>
+
+      {/* Image with Bounding Boxes */}
+      {imageUrl && results.word_boxes && (
+        <div className="mt-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-3">
+            Label Image with Highlighted Text
+          </h3>
+          <ImageWithHighlights imageUrl={imageUrl} verificationResult={results} />
+        </div>
+      )}
 
       {/* Reset Button */}
       <button

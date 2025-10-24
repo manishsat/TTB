@@ -1,9 +1,18 @@
+export interface BoundingBox {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  conf: number;
+}
+
 export interface FieldCheck {
   field_name: string;
   expected_value: string;
   found_value: string | null;
   matched: boolean;
   message: string;
+  bounding_boxes?: BoundingBox[];
 }
 
 export interface VerificationResponse {
@@ -12,6 +21,7 @@ export interface VerificationResponse {
   message: string;
   extracted_text: string;
   checks: FieldCheck[];
+  word_boxes?: Record<string, BoundingBox | BoundingBox[]>;
 }
 
 export interface FormData {
