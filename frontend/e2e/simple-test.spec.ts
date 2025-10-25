@@ -56,32 +56,47 @@ test('Scenario 1: Compliant Standard Bourbon - Should Pass', async ({ page }) =>
   console.log('Clicking verify button...');
   await page.getByRole('button', { name: /verify/i }).click();
   
-  // Wait for results to appear - look for the results section instead of fixed timeout
+  // Wait for processing to complete
   console.log('Waiting for verification results...');
+  await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+  console.log('Processing started...');
+  await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
+  console.log('Processing completed!');
+  await page.waitForTimeout(1000);
   
-  // Wait for either success or error message to appear (max 60 seconds for backend OCR)
-  try {
-    await page.waitForSelector('text=/compliant|non-compliant|verification|error|result/i', { 
-      timeout: 60000,
-      state: 'visible' 
-    });
-    console.log('Results appeared!');
-  } catch (error) {
-    console.log('Timeout waiting for results, taking screenshot anyway...');
-  }
-  
-  // Take a screenshot to see what's on the page
+  // Take a screenshot to see the results
   await page.screenshot({ path: 'test-result.png', fullPage: true });
   console.log('Screenshot saved as test-result.png');
   
-  // Check for results - let's see what text appears
-  const pageContent = await page.content();
-  console.log('Page has content, checking for success indicators...');
+  // Verify the actual OCR results from the backend
+  console.log('Checking for verification results...');
   
-  // Look for any indication of results
-  const hasResults = await page.locator('text=/compliant|verification|result/i').count() > 0;
-  console.log('Has results?', hasResults);
+  // Check for "Verification Passed" heading
+  await expect(page.getByText('Verification Passed')).toBeVisible();
+  console.log('✓ Found "Verification Passed"');
   
-  // Just log what we see for now
-  console.log('Test completed - check test-result.png to see the actual result');
+  // Verify all Field Verification Details:
+  
+  // 1. Brand Name
+  await expect(page.getByText(/Brand name.*Eagle Peak.*found on label/i)).toBeVisible();
+  console.log('✓ Brand Name verified');
+  
+  // 2. Product Class/Type
+  await expect(page.getByText(/Product class.*Bourbon Whiskey.*found on label/i)).toBeVisible();
+  console.log('✓ Product Class verified');
+  
+  // 3. Alcohol Content
+  await expect(page.getByText(/Alcohol content.*45.*matches form/i)).toBeVisible();
+  console.log('✓ Alcohol Content verified');
+  
+  // 4. Net Contents
+  await expect(page.getByText(/Net contents.*750.*found on label/i)).toBeVisible();
+  console.log('✓ Net Contents verified');
+  
+  // 5. Government Warning (Detailed)
+  await expect(page.getByText('Government Warning (Detailed)')).toBeVisible();
+  await expect(page.getByText(/Government warning complies with 27 CFR/i)).toBeVisible();
+  console.log('✓ Government Warning verified');
+  
+  console.log('Test completed successfully - all 5 field verifications passed!');
 });

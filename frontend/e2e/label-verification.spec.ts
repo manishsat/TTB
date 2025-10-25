@@ -38,18 +38,18 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: /verify/i }).click();
     
-    // Wait for "Processing label image..." to appear first
+    // Wait for processing to complete
     await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
-    
-    // Then wait for it to disappear (results loaded) - this is key!
     await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
-    
-    // Wait a bit more for results to fully render
     await page.waitForTimeout(1000);
     
-    // Now check for results
-    const pageContent = await page.textContent('body');
-    expect(pageContent).toMatch(/compliant|pass|success|approved/i);
+    // Verify the actual OCR results
+    await expect(page.getByText('Verification Passed')).toBeVisible();
+    await expect(page.getByText(/Brand name.*Eagle Peak.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Product class.*Bourbon Whiskey.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Alcohol content.*45.*matches form/i)).toBeVisible();
+    await expect(page.getByText(/Net contents.*750.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Government warning complies with 27 CFR/i)).toBeVisible();
   });
 
   test('Scenario 2: Compliant Beer - Should Pass', async ({ page }) => {
@@ -67,15 +67,18 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: /verify/i }).click();
     
-    // Wait for "Processing label image..." to disappear (backend processing complete)
-    await page.waitForSelector('text=/Processing label image/i', { 
-      state: 'hidden',
-      timeout: 60000 
-    });
+    // Wait for processing to complete
+    await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+    await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
+    await page.waitForTimeout(1000);
     
-    // Check for success - just verify results appeared
-    const pageContent = await page.textContent('body');
-    expect(pageContent).toMatch(/compliant|pass|success/i);
+    // Verify the actual OCR results for beer
+    await expect(page.getByText('Verification Passed')).toBeVisible();
+    await expect(page.getByText(/Brand name.*Summit Brew.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Product class.*India Pale Ale.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Alcohol content.*6\.5.*matches form/i)).toBeVisible();
+    await expect(page.getByText(/Net contents.*355.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Government warning complies with 27 CFR/i)).toBeVisible();
   });
 
   test('Scenario 3: Compliant Wine - Should Pass', async ({ page }) => {
@@ -93,15 +96,19 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: /verify/i }).click();
     
-    // Wait for "Processing label image..." to disappear (backend processing complete)
-    await page.waitForSelector('text=/Processing label image/i', { 
-      state: 'hidden',
-      timeout: 60000 
-    });
+    // Wait for processing to complete
+    await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+    await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
+    await page.waitForTimeout(1000);
     
-    // Check for success - just verify results appeared
-    const pageContent = await page.textContent('body');
-    expect(pageContent).toMatch(/compliant|pass|success/i);
+    // Verify the actual OCR results for wine
+    await expect(page.getByText('Verification Passed')).toBeVisible();
+    await expect(page.getByText(/Brand name.*Chateau Valley.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Product class.*Cabernet Sauvignon.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Alcohol content.*13\.5.*matches form/i)).toBeVisible();
+    await expect(page.getByText(/Net contents.*750.*found on label/i)).toBeVisible();
+    // Wine has additional sulfite requirement
+    await expect(page.getByText(/Sulfite declaration found on label/i)).toBeVisible();
   });
 
   test('Scenario 4: Non-Compliant - Incomplete Government Warning', async ({ page }) => {
@@ -119,15 +126,14 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: /verify/i }).click();
     
-    // Wait for "Processing label image..." to disappear (backend processing complete)
-    await page.waitForSelector('text=/Processing label image/i', { 
-      state: 'hidden',
-      timeout: 60000 
-    });
+    // Wait for processing to complete
+    await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+    await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
+    await page.waitForTimeout(1000);
     
-    // Check for non-compliance detected - just verify results appeared
-    const pageContent = await page.textContent('body');
-    expect(pageContent).toMatch(/non-compliant|warning|missing|violation/i);
+    // Verify non-compliant result - should show violations
+    await expect(page.getByText(/does not match the form|Non-compliant/i).first()).toBeVisible();
+    await expect(page.getByText(/Warning non-compliant|violation/i).first()).toBeVisible();
   });
 
   test('Scenario 5: Non-Compliant - Form/Label Mismatch', async ({ page }) => {
@@ -145,15 +151,14 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: /verify/i }).click();
     
-    // Wait for "Processing label image..." to disappear (backend processing complete)
-    await page.waitForSelector('text=/Processing label image/i', { 
-      state: 'hidden',
-      timeout: 60000 
-    });
+    // Wait for processing to complete
+    await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+    await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
+    await page.waitForTimeout(1000);
     
-    // Check for failure - just verify results appeared
-    const pageContent = await page.textContent('body');
-    expect(pageContent).toMatch(/non-compliant|mismatch|differ|verification/i);
+    // Verify mismatch detected
+    await expect(page.getByText(/does not match the form|Non-compliant/i).first()).toBeVisible();
+    await expect(page.getByText(/Alcohol content.*differs|mismatch/i).first()).toBeVisible();
   });
 
   test('Scenario 6: Non-Compliant - Incorrect Capitalization', async ({ page }) => {
@@ -171,15 +176,14 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: /verify/i }).click();
     
-    // Wait for "Processing label image..." to disappear (backend processing complete)
-    await page.waitForSelector('text=/Processing label image/i', { 
-      state: 'hidden',
-      timeout: 60000 
-    });
+    // Wait for processing to complete
+    await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+    await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
+    await page.waitForTimeout(1000);
     
-    // Check for failure with capitalization error - just verify results appeared
-    const pageContent = await page.textContent('body');
-    expect(pageContent).toMatch(/non-compliant|capital|format|verification/i);
+    // Verify capitalization error detected
+    await expect(page.getByText(/does not match the form|Non-compliant/i).first()).toBeVisible();
+    await expect(page.getByText(/capital|format|SURGEON GENERAL/i).first()).toBeVisible();
   });
 
   test('Scenario 9: Edge Case - Tiny Image (Should Reject)', async ({ page }) => {
@@ -197,13 +201,10 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: /verify/i }).click();
     
-    // Wait for "Processing label image..." to disappear (backend processing complete)
-    await page.waitForSelector('text=/Processing label image/i', { 
-      state: 'hidden',
-      timeout: 60000 
-    });
+    // Wait for processing to complete (or error)
+    await page.waitForTimeout(3000);
     
-    // Check for image quality error - just verify results appeared
+    // Check for image quality error
     const pageContent = await page.textContent('body');
     expect(pageContent).toMatch(/image.*quality|resolution.*low|minimum.*400|size|error/i);
   });
