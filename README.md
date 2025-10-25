@@ -92,6 +92,30 @@ npm run dev
 
 The frontend application will be available at `http://localhost:5173`
 
+### 4. Running Tests
+
+```bash
+# Backend unit tests
+cd backend
+pytest
+
+# Run tests with coverage
+pytest --cov=app --cov-report=html
+
+# Run specific test file
+pytest tests/test_verification.py -v
+```
+
+The backend includes 37 comprehensive unit tests covering:
+- ✅ Text normalization and fuzzy matching
+- ✅ Brand name verification
+- ✅ Product type verification
+- ✅ Alcohol content validation (±0.5% tolerance)
+- ✅ Net contents validation
+- ✅ Government warning compliance (27 CFR 16.21)
+- ✅ Beverage-type specific rules (Beer, Wine, Spirits)
+- ✅ OCR error tolerance
+
 ## 📁 Project Structure
 
 ```
