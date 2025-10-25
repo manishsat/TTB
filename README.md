@@ -23,7 +23,7 @@ This full-stack application allows users to:
 - **python-Levenshtein** - Fuzzy string matching for OCR error tolerance
 
 ### Frontend
-- **React 18+** - UI library
+- **React 19** - UI library
 - **TypeScript** - Type-safe JavaScript
 - **Vite** - Build tool and dev server
 - **Tailwind CSS** - Utility-first CSS framework
@@ -94,6 +94,8 @@ The frontend application will be available at `http://localhost:5173`
 
 ### 4. Running Tests
 
+#### Backend Unit Tests
+
 ```bash
 # Backend unit tests
 cd backend
@@ -115,6 +117,15 @@ The backend includes 37 comprehensive unit tests covering:
 - ✅ Government warning compliance (27 CFR 16.21)
 - ✅ Beverage-type specific rules (Beer, Wine, Spirits)
 - ✅ OCR error tolerance
+
+#### Manual Testing
+
+For comprehensive end-to-end testing of the deployed application, see **[MANUAL_TESTING_GUIDE.md](MANUAL_TESTING_GUIDE.md)** which includes:
+- 10 detailed test scenarios with exact test data
+- Compliant and non-compliant label examples
+- Edge cases (blurry images, low contrast, compression)
+- Expected results for each scenario
+- Step-by-step testing instructions
 
 ## 📁 Project Structure
 
@@ -346,8 +357,8 @@ Health check endpoint.
 
 ### OCR Configuration
 - Uses Tesseract's default English language model
-- PSM mode 6 (Assumes uniform block of text)
-- OEM mode 3 (Default, based on available data)
+- **PSM mode 3** (Fully automatic page segmentation - better for labels with large headings)
+- **OEM mode 3** (Default, uses both legacy and LSTM OCR engines)
 
 ## 🚧 Known Limitations
 
@@ -369,23 +380,55 @@ Health check endpoint.
 
 ## 📦 Deployment
 
-### Backend Deployment (Render)
+### Live Application
 
-1. Create a new Web Service on Render
-2. Connect your GitHub repository
-3. Configure:
-   - Build Command: `pip install -r backend/requirements.txt`
-   - Start Command: `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-4. Add environment variables as needed
-5. Deploy
+- **Frontend (Vercel):** https://ttb-lime.vercel.app
+- **Backend API (Railway):** https://ttb-production.up.railway.app
+- **API Docs:** https://ttb-production.up.railway.app/docs
+
+### Backend Deployment (Railway)
+
+The backend is deployed on Railway using Docker:
+
+1. **Dockerfile Configuration:**
+   ```dockerfile
+   FROM python:3.11-slim
+   RUN apt-get update && apt-get install -y tesseract-ocr tesseract-ocr-eng
+   WORKDIR /app
+   COPY requirements.txt .
+   RUN pip install --no-cache-dir -r requirements.txt
+   COPY backend/ ./backend/
+   CMD cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+   ```
+
+2. **Deploy to Railway:**
+   - Connect GitHub repository
+   - Railway auto-detects Dockerfile
+   - Tesseract OCR installed via apt-get
+   - Environment variables configured
+   - Automatic deployments on push to main
 
 ### Frontend Deployment (Vercel)
 
-1. Install Vercel CLI: `npm i -g vercel`
-2. From frontend directory: `vercel`
-3. Follow the prompts
-4. Update `.env.production` with backend URL
-5. Deploy: `vercel --prod`
+The frontend is deployed on Vercel:
+
+1. **Configuration:**
+   - Framework: Vite
+   - Root Directory: `frontend/`
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+
+2. **Environment Variables:**
+   ```
+   VITE_API_URL=https://ttb-production.up.railway.app
+   ```
+
+3. **Deploy:**
+   - Connect GitHub repository
+   - Automatic deployments on push to main
+   - Preview deployments for pull requests
+
+For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ## 🤝 Contributing
 
