@@ -16,6 +16,22 @@ These tests automate the manual testing scenarios from `MANUAL_TESTING_GUIDE.md`
 ✅ **Test Scenario 6:** Non-Compliant - Incorrect Capitalization  
 ✅ **Test Scenario 9:** Edge Case - Tiny Image  
 ✅ **UI Tests:** Form validation, image preview, reset functionality  
+✅ **Visual Regression:** Bounding box rendering (green/red boxes on labels)
+
+### Visual Regression Testing
+
+The tests include **visual regression testing** to verify that bounding boxes are rendered correctly on label images:
+
+- **Green boxes** for compliant fields (7 scenarios covered)
+- **Red boxes** for non-compliant/missing fields (4 scenarios covered)
+
+This catches regressions in the `ImageWithHighlights` component, such as:
+- Boxes not appearing
+- Wrong colors (e.g., green instead of red)
+- Incorrect positioning
+- Missing canvas rendering
+
+The tests compare canvas screenshots against baseline images stored in `e2e/*-snapshots/` directories.  
 
 ## Prerequisites
 
@@ -46,14 +62,24 @@ npm run test:e2e:headed
 npm run test:e2e:report
 ```
 
+### Update visual regression baselines
+If you intentionally change the bounding box rendering logic:
+```bash
+npm run test:e2e -- --update-snapshots
+```
+This will regenerate the baseline images for visual regression tests.
+
 ## Test Structure
 
 ```
 frontend/
 ├── e2e/
-│   └── label-verification.spec.ts    # All E2E test scenarios
-├── playwright.config.ts               # Playwright configuration
-└── package.json                       # Test scripts
+│   ├── label-verification.spec.ts           # All E2E test scenarios
+│   ├── simple-test.spec.ts                  # Single test for debugging
+│   ├── label-verification.spec.ts-snapshots/ # Visual regression baselines
+│   └── simple-test.spec.ts-snapshots/       # Visual regression baselines
+├── playwright.config.ts                      # Playwright configuration
+└── package.json                              # Test scripts
 ```
 
 ## Configuration
@@ -134,6 +160,13 @@ Ensure test images exist:
 - Check `../test_labels/compliance_tests/` directory
 - Verify file paths in test file
 
+### Visual Regression Test Fails
+If bounding box screenshots don't match:
+- **Intentional change?** Update baselines: `npm run test:e2e -- --update-snapshots`
+- **Unexpected change?** Debug in UI mode to see what changed
+- **Platform difference?** Baselines are platform-specific (chromium-darwin, chromium-linux, etc.)
+- View diff images in `test-results/` directory
+
 ## CI/CD Integration
 
 The tests are configured for CI environments:
@@ -153,19 +186,31 @@ CI=true npm run test:e2e
    ```typescript
    test('Test Description', async ({ page }) => {
      // Fill form
-     await page.getByLabel('Brand Name').fill('...');
+     await page.locator('#brandName').fill('...');
      
      // Upload image
-     await page.setInputFiles('input[type="file"]', testImagePath);
+     const testImagePath = path.join(__dirname, '../../test_labels/...');
+     await page.locator('#labelImage').setInputFiles(testImagePath);
      
      // Submit
-     await page.getByRole('button', { name: /verify label/i }).click();
+     await page.getByRole('button', { name: /verify/i }).click();
      
-     // Assert results
-     await expect(page.getByText(/expected text/i)).toBeVisible();
+     // Wait for processing
+     await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+     await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
+     
+     // Assert OCR results
+     await expect(page.getByText(/Brand name.*found on label/i)).toBeVisible();
+     
+     // Visual regression (optional)
+     const canvas = page.locator('canvas');
+     await expect(canvas).toHaveScreenshot('test-name.png', {
+       maxDiffPixels: 100,
+     });
    });
    ```
 3. Run and verify: `npm run test:e2e:ui`
+4. If adding visual regression, generate baseline: `npm run test:e2e -- --update-snapshots`
 
 ## Resources
 
@@ -182,6 +227,21 @@ CI=true npm run test:e2e
 ✅ **Regression Detection:** Catch breaks immediately  
 ✅ **Documentation:** Tests serve as executable documentation  
 ✅ **Coverage:** Test scenarios are always up to date  
+✅ **Visual Validation:** Automated verification of UI rendering (bounding boxes)  
+
+## What the Tests Verify
+
+### Text-Based Assertions
+- All 5 OCR field extraction results (Brand Name, Product Class, Alcohol Content, Net Contents, Government Warning)
+- Specific violation messages for non-compliant labels
+- Form validation errors
+- Processing states and error messages
+
+### Visual Regression
+- Green bounding boxes appear for compliant fields
+- Red bounding boxes appear for non-compliant/missing fields
+- Canvas renders correctly with proper dimensions
+- Box positioning matches OCR word_boxes data  
 
 ---
 

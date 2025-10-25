@@ -98,5 +98,25 @@ test('Scenario 1: Compliant Standard Bourbon - Should Pass', async ({ page }) =>
   await expect(page.getByText(/Government warning complies with 27 CFR/i)).toBeVisible();
   console.log('✓ Government Warning verified');
   
-  console.log('Test completed successfully - all 5 field verifications passed!');
+  // 6. Visual Regression: Verify bounding boxes are rendered correctly
+  console.log('Verifying bounding box rendering...');
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  
+  // Verify the canvas has content (width and height > 0)
+  const canvasSize = await canvas.evaluate((el: HTMLCanvasElement) => ({
+    width: el.width,
+    height: el.height
+  }));
+  expect(canvasSize.width).toBeGreaterThan(0);
+  expect(canvasSize.height).toBeGreaterThan(0);
+  console.log(`✓ Canvas rendered with size: ${canvasSize.width}x${canvasSize.height}`);
+  
+  // Visual regression test: Compare canvas screenshot with baseline
+  await expect(canvas).toHaveScreenshot('compliant-bourbon-boxes.png', {
+    maxDiffPixels: 100,  // Allow minor rendering differences
+  });
+  console.log('✓ Bounding boxes match baseline image');
+  
+  console.log('Test completed successfully - all 5 field verifications + visual regression passed!');
 });
