@@ -50,6 +50,13 @@ test.describe('TTB Label Verification E2E Tests', () => {
     await expect(page.getByText(/Alcohol content.*45.*matches form/i)).toBeVisible();
     await expect(page.getByText(/Net contents.*750.*found on label/i)).toBeVisible();
     await expect(page.getByText(/Government warning complies with 27 CFR/i)).toBeVisible();
+    
+    // Visual regression: Verify green bounding boxes are rendered
+    const canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveScreenshot('scenario1-compliant-bourbon.png', {
+      maxDiffPixels: 100,
+    });
   });
 
   test('Scenario 2: Compliant Beer - Should Pass', async ({ page }) => {
@@ -79,6 +86,13 @@ test.describe('TTB Label Verification E2E Tests', () => {
     await expect(page.getByText(/Alcohol content.*6\.5.*matches form/i)).toBeVisible();
     await expect(page.getByText(/Net contents.*355.*found on label/i)).toBeVisible();
     await expect(page.getByText(/Government warning complies with 27 CFR/i)).toBeVisible();
+    
+    // Visual regression: Verify green bounding boxes for beer label
+    const canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveScreenshot('scenario2-compliant-beer.png', {
+      maxDiffPixels: 100,
+    });
   });
 
   test('Scenario 3: Compliant Wine - Should Pass', async ({ page }) => {
@@ -109,6 +123,13 @@ test.describe('TTB Label Verification E2E Tests', () => {
     await expect(page.getByText(/Net contents.*750.*found on label/i)).toBeVisible();
     // Wine has additional sulfite requirement
     await expect(page.getByText(/Sulfite declaration found on label/i)).toBeVisible();
+    
+    // Visual regression: Verify green bounding boxes for wine label
+    const canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveScreenshot('scenario3-compliant-wine.png', {
+      maxDiffPixels: 100,
+    });
   });
 
   test('Scenario 4: Non-Compliant - Incomplete Government Warning', async ({ page }) => {
@@ -134,6 +155,13 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Verify non-compliant result - should show violations
     await expect(page.getByText(/does not match the form|Non-compliant/i).first()).toBeVisible();
     await expect(page.getByText(/Warning non-compliant|violation/i).first()).toBeVisible();
+    
+    // Visual regression: Verify red bounding boxes for violations
+    const canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveScreenshot('scenario4-noncompliant-warning.png', {
+      maxDiffPixels: 100,
+    });
   });
 
   test('Scenario 5: Non-Compliant - Form/Label Mismatch', async ({ page }) => {
@@ -159,6 +187,13 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Verify mismatch detected
     await expect(page.getByText(/does not match the form|Non-compliant/i).first()).toBeVisible();
     await expect(page.getByText(/Alcohol content.*differs|mismatch/i).first()).toBeVisible();
+    
+    // Visual regression: Verify red bounding boxes for mismatch
+    const canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveScreenshot('scenario5-noncompliant-mismatch.png', {
+      maxDiffPixels: 100,
+    });
   });
 
   test('Scenario 6: Non-Compliant - Incorrect Capitalization', async ({ page }) => {
@@ -184,6 +219,13 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Verify capitalization error detected
     await expect(page.getByText(/does not match the form|Non-compliant/i).first()).toBeVisible();
     await expect(page.getByText(/capital|format|SURGEON GENERAL/i).first()).toBeVisible();
+    
+    // Visual regression: Verify red bounding boxes for capitalization error
+    const canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible();
+    await expect(canvas).toHaveScreenshot('scenario6-noncompliant-capitalization.png', {
+      maxDiffPixels: 100,
+    });
   });
 
   test('Scenario 9: Edge Case - Tiny Image (Should Reject)', async ({ page }) => {
