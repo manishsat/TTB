@@ -60,7 +60,7 @@ from app.models import VerificationResponse, FieldCheck, BeverageType
 
 logger = logging.getLogger(__name__)
 
-# Government warning text patterns
+# Government warning text patterns (basic check)
 GOVT_WARNING_KEYWORDS = [
     "government warning",
     "surgeon general",
@@ -68,6 +68,106 @@ GOVT_WARNING_KEYWORDS = [
     "birth defects",
     "operating machinery"
 ]
+
+# Official TTB required warning text (27 CFR 16.21)
+REQUIRED_WARNING_TEXT = """GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems."""
+
+
+def extract_government_warning(text: str) -> Optional[str]:
+    """
+    Extract the government warning section from OCR text
+    
+    Args:
+        text: Full OCR extracted text
+        
+    Returns:
+        Extracted warning text or None
+    """
+    # Look for text starting with "GOVERNMENT WARNING"
+    pattern = r'GOVERNMENT WARNING:.*?(?:health problems|$)'
+    match = re.search(pattern, text, re.IGNORECASE | re.DOTALL)
+    
+    if match:
+        warning_text = match.group(0)
+        # Clean up extra whitespace but preserve structure
+        warning_text = re.sub(r'\s+', ' ', warning_text).strip()
+        return warning_text
+    
+    return None
+
+
+def validate_warning_compliance(extracted_text: str) -> tuple[bool, list[str]]:
+    """
+    Detailed compliance check for government warning per 27 CFR 16.21
+    
+    Checks:
+    - "GOVERNMENT WARNING" in all caps
+    - "Surgeon General" with proper capitalization
+    - Both statements (1) and (2) present
+    - Overall text similarity to required warning
+    
+    Args:
+        extracted_text: Full OCR text from label
+        
+    Returns:
+        Tuple of (is_compliant, list_of_violations)
+    """
+    violations = []
+    
+    # Extract warning section
+    warning_text = extract_government_warning(extracted_text)
+    
+    if not warning_text:
+        violations.append("Government warning statement not found")
+        return False, violations
+    
+    # Check 1: "GOVERNMENT WARNING" must be in all caps
+    if "GOVERNMENT WARNING:" not in warning_text:
+        if "government warning:" in warning_text.lower():
+            violations.append("'GOVERNMENT WARNING' must be in all capital letters")
+    
+    # Check 2: "Surgeon General" capitalization (not "surgeon general" or "Surgeon general")
+    if "surgeon general" in warning_text.lower():
+        # Check if it's properly capitalized
+        if "Surgeon General" not in warning_text:
+            violations.append("'Surgeon General' must have capital S and capital G")
+    
+    # Check 3: Both statements (1) and (2) must be present
+    has_statement_1 = "(1)" in warning_text or "1)" in warning_text
+    has_statement_2 = "(2)" in warning_text or "2)" in warning_text
+    
+    if not has_statement_1:
+        violations.append("Statement (1) about pregnancy and birth defects is missing")
+    if not has_statement_2:
+        violations.append("Statement (2) about driving/machinery is missing")
+    
+    # Check 4: Key phrases must be present
+    required_phrases = [
+        ("women should not drink", "women and pregnancy warning"),
+        ("birth defects", "birth defects warning"),
+        ("drive a car or operate machinery", "driving/machinery warning"),
+        ("health problems", "health problems warning")
+    ]
+    
+    warning_lower = warning_text.lower()
+    for phrase, description in required_phrases:
+        if phrase not in warning_lower:
+            violations.append(f"Missing required phrase: '{description}'")
+    
+    # Check 5: Overall similarity to required text (fuzzy match for OCR tolerance)
+    # Normalize both texts for comparison
+    normalized_required = normalize_text(REQUIRED_WARNING_TEXT)
+    normalized_found = normalize_text(warning_text)
+    
+    similarity = ratio(normalized_required, normalized_found)
+    
+    # Require high similarity (0.90) since this is regulatory text
+    if similarity < 0.90:
+        violations.append(f"Warning text differs from required regulatory text (similarity: {similarity:.2%})")
+    
+    is_compliant = len(violations) == 0
+    
+    return is_compliant, violations
 
 
 def extract_volume(text: str) -> Optional[str]:
@@ -413,30 +513,28 @@ def verify_label_data(
             ))
             all_matched = all_matched and net_matched
     
-    # Check 5: Government Warning (bonus check)
-    warning_found, found_warning = any(
-        (match := fuzzy_match(extracted_text, keyword, threshold=0.85))[0]
-        for keyword in GOVT_WARNING_KEYWORDS
-    ) or (False, None), None
+    # Check 5: Government Warning - Detailed Compliance Check (27 CFR 16.21)
+    warning_compliant, violations = validate_warning_compliance(extracted_text)
     
-    # Simpler approach - just check if any keyword matches
-    warning_matched = False
-    for keyword in GOVT_WARNING_KEYWORDS:
-        matched, _ = fuzzy_match(extracted_text, keyword, threshold=0.85)
-        if matched:
-            warning_matched = True
-            break
+    if warning_compliant:
+        warning_message = "✓ Government warning complies with 27 CFR 16.21 requirements"
+        warning_found_value = "Compliant"
+    else:
+        # List all violations
+        violation_details = "; ".join(violations)
+        warning_message = f"✗ Warning non-compliant: {violation_details}"
+        warning_found_value = f"Non-compliant ({len(violations)} violations)"
     
     checks.append(FieldCheck(
-        field_name="Government Warning",
-        expected_value="Required warning text",
-        found_value="Present" if warning_matched else "Not found",
-        matched=warning_matched,
-        message="✓ Government warning statement found on label" if warning_matched
-                else "⚠️ Government warning statement not detected (required by law)"
+        field_name="Government Warning (Detailed)",
+        expected_value="27 CFR 16.21 compliant warning",
+        found_value=warning_found_value,
+        matched=warning_compliant,
+        message=warning_message,
+        violations=violations if not warning_compliant else None
     ))
-    # Warning is important but won't fail the overall match for now
-    # In production, this would be mandatory
+    # Government warning is mandatory - fail verification if non-compliant
+    all_matched = all_matched and warning_compliant
     
     # Beverage-type specific checks
     if beverage_type == BeverageType.WINE:

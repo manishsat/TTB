@@ -13,6 +13,7 @@ export interface FieldCheck {
   matched: boolean;
   message: string;
   bounding_boxes?: BoundingBox[];
+  violations?: string[];
 }
 
 export interface VerificationResponse {

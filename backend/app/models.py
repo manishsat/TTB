@@ -30,6 +30,7 @@ class FieldCheck(BaseModel):
     matched: bool = Field(..., description="Whether the field matched")
     message: str = Field(..., description="Detailed message about the check")
     bounding_boxes: Optional[List[BoundingBox]] = Field(None, description="Bounding boxes where text was found")
+    violations: Optional[List[str]] = Field(None, description="List of specific violations (for warning compliance)")
 
 
 class VerificationResponse(BaseModel):

@@ -212,7 +212,7 @@ class TestVerifyLabelData:
         Aged 4 Years
         45% Alc./Vol. (90 Proof)
         750 mL
-        GOVERNMENT WARNING: According to the Surgeon General, women should not drink
+        GOVERNMENT WARNING: (1) According to the Surgeon General, women should not drink alcoholic beverages during pregnancy because of the risk of birth defects. (2) Consumption of alcoholic beverages impairs your ability to drive a car or operate machinery, and may cause health problems.
         """
         
         result = verify_label_data(
@@ -224,7 +224,7 @@ class TestVerifyLabelData:
         )
         
         assert result.overall_match is True
-        assert all(check.matched for check in result.checks if check.field_name != "Government Warning")
+        assert all(check.matched for check in result.checks)
         
     def test_brand_mismatch(self):
         """Test verification with brand name mismatch"""
