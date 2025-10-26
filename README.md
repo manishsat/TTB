@@ -59,15 +59,42 @@ git clone https://github.com/manishsat/TTB.git
 cd TTB
 ```
 
-### 2. Backend Setup
+### 2. Quick Setup (Recommended)
+
+Run the automated setup script to configure everything:
+
+```bash
+./setup.sh
+```
+
+This script will:
+- ✓ Check prerequisites (Python, Node.js)
+- ✓ Set up Python virtual environment
+- ✓ Install all backend dependencies
+- ✓ Install all frontend dependencies
+- ✓ Create .env files with default configuration
+- ✓ Install Playwright browsers for E2E testing
+- ✓ Run backend tests to verify setup
+
+After running the setup script, follow the displayed instructions to start the servers.
+
+### 3. Manual Setup (Alternative)
+
+If you prefer to set up manually instead of using the script:
+
+#### Backend Setup
 
 ```bash
 # Create and activate virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+python3 -m venv backend/venv
+source backend/venv/bin/activate  # On Windows: backend\venv\Scripts\activate
 
 # Install Python dependencies
 pip install -r backend/requirements.txt
+
+# Create backend/.env file (optional, for custom configuration)
+# PORT=8000
+# FLASK_ENV=development
 
 # Start the backend server
 cd backend
@@ -77,7 +104,7 @@ python -m uvicorn app.main:app --reload --port 8000
 The backend API will be available at `http://localhost:8000`
 API documentation (Swagger UI): `http://localhost:8000/docs`
 
-### 3. Frontend Setup
+#### Frontend Setup
 
 ```bash
 # In a new terminal, navigate to frontend directory
@@ -85,6 +112,9 @@ cd frontend
 
 # Install dependencies
 npm install
+
+# Create frontend/.env file (optional)
+# VITE_API_URL=http://localhost:8000
 
 # Start the development server
 npm run dev
