@@ -138,6 +138,11 @@ const ImageWithHighlights: React.FC<Props> = ({ imageUrl, verificationResult }) 
           });
         });
       } else {
+        // Skip highlighting for Government Warning fields (they have status messages, not OCR text)
+        if (check.field_name === 'Government Warning' || check.field_name === 'Government Warning (Detailed)') {
+          return;
+        }
+        
         // For failed fields, highlight what was found
         if (check.found_value && check.found_value !== 'Not found' && check.found_value !== 'Not found or mismatch') {
           let foundWords: string[];
