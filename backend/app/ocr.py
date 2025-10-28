@@ -3,7 +3,7 @@ OCR (Optical Character Recognition) module
 Handles text extraction from label images using Tesseract
 """
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import io
 import logging
 
@@ -60,7 +60,8 @@ def validate_image_quality(image_bytes: bytes) -> tuple[bool, str]:
 
 def extract_text_from_image(image_bytes: bytes) -> str:
     """
-    Extract text from image using Tesseract OCR
+    Extract text from image using Tesseract OCR with enhanced preprocessing
+    Tries multiple strategies to handle decorative fonts and various label designs
     
     Args:
         image_bytes: Image file as bytes
@@ -76,15 +77,89 @@ def extract_text_from_image(image_bytes: bytes) -> str:
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
-        # Perform OCR
-        # PSM 3 = Fully automatic page segmentation (better for labels with large headings)
-        # OEM 3 = Default OCR Engine Mode (uses both legacy and LSTM engines)
+        all_text_lines = set()  # Use set to avoid duplicates
+        width, height = image.size
+        
+        # Strategy 1: Standard OCR with PSM 3 (fully automatic)
         custom_config = r'--oem 3 --psm 3'
-        text = pytesseract.image_to_string(image, config=custom_config)
+        text1 = pytesseract.image_to_string(image, config=custom_config)
+        all_text_lines.update(line.strip() for line in text1.split('\n') if line.strip())
         
-        logger.info(f"OCR extracted {len(text)} characters")
+        # Strategy 2: Try PSM 4 (single column of text) - good for vertically stacked text
+        text2 = pytesseract.image_to_string(image, config=r'--oem 3 --psm 4')
+        all_text_lines.update(line.strip() for line in text2.split('\n') if line.strip())
         
-        return text.strip()
+        # Strategy 3: Enhanced contrast (helps with low-contrast decorative text)
+        enhancer = ImageEnhance.Contrast(image)
+        enhanced = enhancer.enhance(2.5)
+        text3 = pytesseract.image_to_string(enhanced, config=custom_config)
+        all_text_lines.update(line.strip() for line in text3.split('\n') if line.strip())
+        
+        # Strategy 4: Sharpening (helps with slightly blurry decorative fonts)
+        sharpened = image.filter(ImageFilter.SHARPEN)
+        text4 = pytesseract.image_to_string(sharpened, config=custom_config)
+        all_text_lines.update(line.strip() for line in text4.split('\n') if line.strip())
+        
+        # Strategy 5: Scale up 1.5x (helps with small text or low resolution)
+        scaled = image.resize((int(width * 1.5), int(height * 1.5)), Image.Resampling.LANCZOS)
+        text5 = pytesseract.image_to_string(scaled, config=custom_config)
+        all_text_lines.update(line.strip() for line in text5.split('\n') if line.strip())
+        
+        # Strategy 6: CRITICAL - Crop top 40% and use PSM 6 (uniform block)
+        # This catches large decorative brand names that PSM 3 misses
+        top_area = image.crop((int(width * 0.05), int(height * 0.1), int(width * 0.95), int(height * 0.4)))
+        text6 = pytesseract.image_to_string(top_area, config=r'--oem 3 --psm 6')
+        top_lines = [line.strip() for line in text6.split('\n') if line.strip() and len(line.strip()) > 2]
+        if top_lines:
+            logger.info(f"Top area OCR (PSM 6) found: {top_lines}")
+            all_text_lines.update(top_lines)
+        
+        # Strategy 7: Try PSM 11 on top area (sparse text with OSD)
+        # Sometimes works better with decorative fonts spread out
+        text7a = pytesseract.image_to_string(top_area, config=r'--oem 3 --psm 11')
+        psm11_lines = [line.strip() for line in text7a.split('\n') if line.strip() and len(line.strip()) > 2]
+        if psm11_lines:
+            logger.info(f"Top area OCR (PSM 11) found: {psm11_lines}")
+            all_text_lines.update(psm11_lines)
+        
+        # Strategy 8: Binary threshold on top area (high contrast for decorative text)
+        gray_top = top_area.convert('L')
+        binary_top = gray_top.point(lambda x: 0 if x < 180 else 255, '1')
+        text8 = pytesseract.image_to_string(binary_top, config=r'--oem 3 --psm 6')
+        binary_lines = [line.strip() for line in text8.split('\n') if line.strip() and len(line.strip()) > 2]
+        if binary_lines:
+            logger.info(f"Binary threshold OCR found: {binary_lines}")
+            all_text_lines.update(binary_lines)
+        
+        # Strategy 9: Inverted contrast on top area (alternative for decorative text)
+        inverted_top = ImageOps.invert(gray_top)
+        contrast_inv = ImageEnhance.Contrast(inverted_top).enhance(3.0)
+        text9 = pytesseract.image_to_string(contrast_inv, config=r'--oem 3 --psm 6')
+        inv_lines = [line.strip() for line in text9.split('\n') if line.strip() and len(line.strip()) > 2]
+        if inv_lines:
+            logger.info(f"Inverted top area OCR found: {inv_lines}")
+            all_text_lines.update(inv_lines)
+        
+        # Build combined text preserving logical order
+        # Standard OCR (text1) gives us the baseline order
+        base_lines = [line.strip() for line in text1.split('\n') if line.strip()]
+        
+        # Add any new lines found by other strategies at the top
+        # (assumes brand name is at top and most likely to be missed)
+        new_lines = all_text_lines - set(base_lines)
+        
+        if new_lines:
+            logger.info(f"Enhanced OCR found {len(new_lines)} additional lines: {list(new_lines)[:5]}")
+            # Sort new lines to put longer ones first (likely to be brand names)
+            sorted_new = sorted(new_lines, key=len, reverse=True)
+            combined = '\n'.join(sorted_new) + '\n' + '\n'.join(base_lines)
+        else:
+            combined = '\n'.join(base_lines)
+        
+        logger.info(f"OCR extracted {len(combined)} characters using 9 preprocessing strategies")
+        logger.info(f"Total unique lines found: {len(all_text_lines)}")
+        
+        return combined.strip()
         
     except Exception as e:
         logger.error(f"Error extracting text from image: {str(e)}")
@@ -94,6 +169,7 @@ def extract_text_from_image(image_bytes: bytes) -> str:
 def extract_text_with_boxes(image_bytes: bytes) -> tuple[str, dict]:
     """
     Extract text from image with bounding box coordinates for highlighting
+    Uses enhanced multi-strategy OCR for better text extraction
     
     Args:
         image_bytes: Image file as bytes
@@ -103,21 +179,19 @@ def extract_text_with_boxes(image_bytes: bytes) -> tuple[str, dict]:
         word_boxes_dict: {word: {'left': x, 'top': y, 'width': w, 'height': h, 'conf': confidence}}
     """
     try:
-        # Open image from bytes
+        # Use the enhanced multi-strategy OCR for text extraction
+        enhanced_text = extract_text_from_image(image_bytes)
+        
+        # Still need to get bounding boxes from standard OCR
+        # (bounding boxes require image_to_data which is only available with standard OCR)
         image = Image.open(io.BytesIO(image_bytes))
         
         # Convert to RGB if necessary
         if image.mode != 'RGB':
             image = image.convert('RGB')
         
-        # Perform OCR with detailed data
+        # Get detailed word-level data with bounding boxes using standard OCR
         custom_config = r'--oem 3 --psm 3'
-        
-        # Get text
-        text = pytesseract.image_to_string(image, config=custom_config)
-        
-        # Get detailed word-level data with bounding boxes
-        # Returns: level, page_num, block_num, par_num, line_num, word_num, left, top, width, height, conf, text
         data = pytesseract.image_to_data(image, config=custom_config, output_type=pytesseract.Output.DICT)
         
         # Build word boxes dictionary
@@ -131,7 +205,6 @@ def extract_text_with_boxes(image_bytes: bytes) -> tuple[str, dict]:
             # Only include words with good confidence (> 30) and non-empty text
             if word_text and conf > 30:
                 # Store bounding box info for each word
-                # If word appears multiple times, store as list
                 box_info = {
                     'left': data['left'][i],
                     'top': data['top'][i],
@@ -151,9 +224,10 @@ def extract_text_with_boxes(image_bytes: bytes) -> tuple[str, dict]:
                 else:
                     word_boxes[word_lower] = box_info
         
-        logger.info(f"OCR extracted {len(text)} characters with {len(word_boxes)} unique words")
+        logger.info(f"Enhanced OCR extracted {len(enhanced_text)} characters with {len(word_boxes)} bounding boxes")
         
-        return text.strip(), word_boxes
+        # Return enhanced text with bounding boxes from standard OCR
+        return enhanced_text.strip(), word_boxes
         
     except Exception as e:
         logger.error(f"Error extracting text with boxes: {str(e)}")

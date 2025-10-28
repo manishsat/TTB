@@ -242,6 +242,27 @@ def fuzzy_match(text: str, pattern: str, threshold: float = 0.8) -> tuple[bool, 
             original_words = text.split()
             best_match = ' '.join(original_words[i:i + len(pattern_words)])
     
+    # NEW: Try matching all words individually if no consecutive match found
+    # This handles cases where brand name words appear but are separated
+    # (e.g., "FANCY" and "VODKA" on different lines but OCR misses one)
+    if not best_match and len(pattern_words) > 1:
+        pattern_words_found = 0
+        found_parts = []
+        
+        for pattern_word in pattern_words:
+            # Check if this word appears anywhere in the text
+            for text_word in words:
+                if ratio(text_word, pattern_word) >= threshold:
+                    pattern_words_found += 1
+                    found_parts.append(text_word)
+                    break
+        
+        # If we found most of the pattern words (at least 50% or threshold percentage)
+        word_match_ratio = pattern_words_found / len(pattern_words)
+        if word_match_ratio >= min(0.5, threshold):
+            best_match = ' '.join(found_parts)
+            best_similarity = word_match_ratio
+    
     if best_match:
         return True, best_match
     

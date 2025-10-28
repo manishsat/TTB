@@ -228,6 +228,55 @@ test.describe('TTB Label Verification E2E Tests', () => {
     });
   });
 
+  test('Scenario 7: Decorative Font - Fancy Vodka (Enhanced OCR)', async ({ page }) => {
+    // Capture console logs
+    page.on('console', msg => {
+      if (msg.text().includes('[RED BOX DEBUG]') || msg.text().includes('[GREEN BOX DEBUG]')) {
+        console.log('BROWSER:', msg.text());
+      }
+    });
+    
+    // Fill in the form for Fancy Vodka label with decorative fonts
+    await page.locator('#brandName').fill('Fancy Vodka');
+    await page.locator('#beverageType').selectOption('spirits');
+    await page.locator('#productClass').fill('Vodka');
+    await page.locator('#alcoholContent').fill('40');
+    await page.locator('#netContents').fill('750');
+    
+    // Upload the Fancy Vodka test image
+    const testImagePath = path.join(__dirname, '../../test_labels/Fancy_Vodka.png');
+    await page.locator('#labelImage').setInputFiles(testImagePath);
+    
+    // Submit the form
+    await page.getByRole('button', { name: /verify/i }).click();
+    
+    // Wait for processing to complete
+    await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+    await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 60000 });
+    await page.waitForTimeout(1000);
+    
+    // Verify the enhanced OCR successfully extracted decorative brand name
+    // Brand, Product, Alcohol, and Net Contents should pass
+    await expect(page.getByText(/Brand name.*Fancy Vodka.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Product class.*Vodka.*found on label/i)).toBeVisible();
+    await expect(page.getByText(/Alcohol content.*40.*matches form/i)).toBeVisible();
+    await expect(page.getByText(/Net contents.*750.*found on label/i)).toBeVisible();
+    
+    // Note: Government warning will fail due to extra statement (3) - this is expected
+    // The label has non-standard text about persons under 21
+    
+    // Visual regression: Verify bounding boxes are rendered for decorative fonts
+    const canvas = page.locator('canvas');
+    await expect(canvas).toBeVisible();
+    
+    // Wait extra time for canvas to fully render all bounding boxes
+    await page.waitForTimeout(2000);
+    
+    await expect(canvas).toHaveScreenshot('scenario7-fancy-vodka-decorative.png', {
+      maxDiffPixels: 100,
+    });
+  });
+
   test('Scenario 9: Edge Case - Tiny Image (Should Reject)', async ({ page }) => {
     // Fill in the form using ID selectors
     await page.locator('#brandName').fill('Mini Distillery');
@@ -243,12 +292,12 @@ test.describe('TTB Label Verification E2E Tests', () => {
     // Submit the form
     await page.getByRole('button', { name: /verify/i }).click();
     
-    // Wait for processing to complete (or error)
-    await page.waitForTimeout(3000);
+    // Wait for processing to start and then complete
+    await page.waitForSelector('text="Processing label image..."', { timeout: 5000 });
+    await page.waitForSelector('text="Processing label image..."', { state: 'hidden', timeout: 10000 });
     
-    // Check for image quality error
-    const pageContent = await page.textContent('body');
-    expect(pageContent).toMatch(/image.*quality|resolution.*low|minimum.*400|size|error/i);
+    // Check for image quality error message
+    await expect(page.getByText(/image.*quality|resolution|minimum.*400|size.*small/i)).toBeVisible({ timeout: 5000 });
   });
 
   test('UI: Form Validation - Required Fields', async ({ page }) => {
